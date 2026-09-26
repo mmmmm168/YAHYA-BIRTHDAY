@@ -3537,14 +3537,11 @@ function clearMemoryTimers(){
     clearTimeout(memoryState.introTimer);
     clearTimeout(memoryState.endTimer);
     clearTimeout(memoryState.controlsTimer);
+    clearInterval(memoryState.particleTimer);
     memoryState.timer = null;
     memoryState.introTimer = null;
-    memoryState.audioMonitor = null;
     memoryState.endTimer = null;
     memoryState.controlsTimer = null;
-    memoryState.audioMonitor = null;
-        scheduleMemorySongContinuation();
-    memoryState.audioRestartTimer = null;
     memoryState.particleTimer = null;
 }
 
@@ -3698,13 +3695,6 @@ function startMemoryMusic(){
         };
         cakeBirthdaySong.addEventListener("ended",memoryState.audioEndedHandler);
     }
-
-    memoryState.audioMonitor = setInterval(function(){
-        if(!memoryState.open || !memoryState.musicStartedHere || memoryState.index>=memoryState.images.length-1){return;}
-        const synthEnded = memoryState.musicStartedHere && !cakeSynthMaster && cakeBirthdaySong.paused && cakeBirthdaySong.currentTime===0;
-        const audioEnded = cakeBirthdaySong.ended;
-        if(synthEnded || audioEnded){startCakeBirthdaySong();}
-    },1200);
 }
 
 function setMemoryMuted(muted){
@@ -3764,8 +3754,6 @@ function createFinalMemorySparkles(){
 function finishMemorySlideshow(){
     if(!memoryState.open || document.getElementById("memoryExperience").classList.contains("ending")){return;}
     clearTimeout(memoryState.timer);
-    clearInterval(memoryState.audioMonitor);
-    memoryState.audioMonitor = null;
     document.getElementById("memoryTimelineFill").classList.remove("running");
 
     const experience = document.getElementById("memoryExperience");
@@ -3936,17 +3924,6 @@ function playMemoryMusic(){
         };
         cakeBirthdaySong.addEventListener("ended",memoryState.audioEndedHandler);
     }
-}
-
-function scheduleMemorySongContinuation(){
-    if(!memoryState.open || !memoryState.musicStartedHere || memoryState.index>=memoryState.images.length-1){return;}
-    clearTimeout(memoryState.audioRestartTimer);
-    memoryState.audioRestartTimer = setTimeout(function(){
-        if(memoryState.open && memoryState.musicStartedHere && memoryState.index<memoryState.images.length-1){
-            startCakeBirthdaySong();
-            scheduleMemorySongContinuation();
-        }
-    },17000);
 }
 
 function closeMemoryExperience(){
