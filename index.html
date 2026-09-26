@@ -3615,7 +3615,11 @@ function showMemoryPhoto(index,animate){
     incoming.onerror = function(){
         incoming.onload = null;
         incoming.onerror = null;
-        showMemoryPhoto(memoryState.index+1,animate);
+        if(memoryState.index < memoryState.images.length-1){
+            showMemoryPhoto(memoryState.index+1,animate);
+        }else{
+            finishMemorySlideshow();
+        }
     };
     incoming.src = imageData.src;
 
@@ -3709,6 +3713,10 @@ function setMemoryMuted(muted){
         cakeSynthMaster.gain.setTargetAtTime(muted ? 0 : .18,now,.06);
     }else if(!cakeBirthdaySong.paused){
         cakeBirthdaySong.volume = muted ? 0 : .38;
+    }
+
+    if(!muted && memoryState.open && memoryState.musicStartedHere && cakeBirthdaySong.paused && !cakeSynthMaster){
+        startCakeBirthdaySong();
     }
 }
 
@@ -3918,7 +3926,7 @@ function playMemoryMusic(){
             if(!memoryState.open){return;}
             if(memoryState.index === memoryState.images.length-1){
                 finishMemorySlideshow();
-            }else if(memoryState.musicStartedHere){
+            }else if(memoryState.musicStartedHere && !memoryState.muted){
                 startCakeBirthdaySong();
             }
         };
