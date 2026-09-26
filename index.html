@@ -1996,7 +1996,8 @@ body{
 .memoryPhoto.focusIn{filter:blur(0);}
 .memoryCaption{position:absolute;z-index:3;right:0;bottom:22px;left:0;color:#eee0c7;font:400 12px/1.5 Segoe UI,Arial,sans-serif;letter-spacing:1.8px;text-align:center;text-shadow:0 2px 18px rgba(0,0,0,.9);opacity:0;transition:opacity .6s ease;}
 .memoryCaption.visible{opacity:.88;}
-.memoryCounter{position:absolute;top:22px;right:clamp(18px,5vw,70px);z-index:5;color:rgba(244,226,195,.72);font:500 10px/1.4 Segoe UI,Arial,sans-serif;letter-spacing:2px;}
+.memoryCounter{position:absolute;top:22px;right:clamp(18px,5vw,70px);z-index:5;color:rgba(244,226,195,.72);font:500 10px/1.4 Segoe UI,Arial,sans-serif;letter-spacing:2px;opacity:0;transition:opacity .5s ease;}
+.memoryViewer.visible .memoryCounter{opacity:1;}
 .memorySweep{z-index:2;opacity:0;background:linear-gradient(105deg,transparent 36%,rgba(255,227,173,.16) 49%,rgba(251,247,233,.34) 50%,rgba(229,185,110,.14) 52%,transparent 66%);transform:translateX(-115%);}
 .memorySweep.active{animation:memoryLightSweep .85s ease both;}
 @keyframes memoryLightSweep{25%{opacity:.9;}100%{opacity:0;transform:translateX(115%);}}
@@ -2028,6 +2029,8 @@ body{
 .memoryExperience .memoryPhoto.parallax.visible{transform:perspective(1000px) rotateX(var(--memory-rotate-x,0deg)) rotateY(var(--memory-rotate-y,0deg)) scale(1.015);}
 .memoryFinalParticle{position:absolute;z-index:3;width:4px;height:4px;border-radius:50%;background:#f7dfa7;box-shadow:0 0 12px 4px rgba(239,201,126,.45);pointer-events:none;animation:memoryFinaleSpark 2.2s ease-out forwards;}
 @keyframes memoryFinaleSpark{0%{opacity:0;transform:translateY(16px) scale(.5);}25%{opacity:.95;}100%{opacity:0;transform:translateY(-80px) scale(1.3);}}
+.memoryFinalConfetti{position:absolute;z-index:3;top:-14px;width:5px;height:10px;border-radius:2px;background:var(--memory-confetti,#e7c47e);opacity:0;pointer-events:none;animation:memoryConfettiFall var(--memory-confetti-duration,4s) ease-in var(--memory-confetti-delay,0s) forwards;}
+@keyframes memoryConfettiFall{0%{opacity:0;transform:translate3d(0,-3vh,0) rotate(0);}12%{opacity:.8;}100%{opacity:0;transform:translate3d(var(--memory-confetti-drift,20px),105vh,0) rotate(430deg);}}
 
 @media(max-width:600px){
     .memoryViewer{padding:64px 12px 75px;}
@@ -2042,7 +2045,7 @@ body{
 }
 
 @media(prefers-reduced-motion:reduce){
-    .memoryExperience,.memoryIntro,.memoryViewer,.memoryPhoto,.memoryBackdrop,.memoryEnding,.memoryControls,.memoryTimelineFill,.memoryRay,.memoryParticle,.memorySweep{animation:none!important;transition-duration:.01ms!important;}
+    .memoryExperience,.memoryIntro,.memoryViewer,.memoryPhoto,.memoryBackdrop,.memoryEnding,.memoryControls,.memoryTimelineFill,.memoryRay,.memoryParticle,.memorySweep,.memoryFinalConfetti{animation:none!important;transition-duration:.01ms!important;}
     .memoryExperience.transitioning{filter:none;}
     .memoryExperience .memoryPhoto.visible,.memoryExperience .memoryPhoto.panLeft.visible,.memoryExperience .memoryPhoto.panRight.visible,.memoryExperience .memoryPhoto.panUp.visible,.memoryExperience .memoryPhoto.parallax.visible{transform:none;}
 }
@@ -3567,15 +3570,11 @@ function addMemoryParticles(){
 
 function loadMemoryImages(){
     const filenames = Array.isArray(window.YAHYA_MEMORY_FILES) ? window.YAHYA_MEMORY_FILES : [];
-    return Promise.all(filenames.map(function(filename){
-        return new Promise(function(resolve){
-            const image = new Image();
-            const path = "./memories/"+filename.split("/").map(encodeURIComponent).join("/");
-            image.onload = function(){resolve({src:path,width:image.naturalWidth,height:image.naturalHeight});};
-            image.onerror = function(){resolve(null);};
-            image.src = path;
-        });
-    })).then(function(images){return images.filter(Boolean);});
+    return Promise.resolve(filenames
+        .filter(filename=>/\.(jpe?g|png|webp|gif)$/i.test(filename))
+        .map(function(filename){
+            return {src:"./memories/"+filename.split("/").map(encodeURIComponent).join("/"),width:0,height:0,preloader:null};
+        }));
 }
 
 function showMemoryPhoto(index,animate){
@@ -3590,6 +3589,8 @@ function showMemoryPhoto(index,animate){
     incoming.onload = function(){
         incoming.className = "memoryPhoto";
         incoming.classList.add(memoryMovementList[memoryState.index%memoryMovementList.length]);
+        imageData.width = incoming.naturalWidth;
+        imageData.height = incoming.naturalHeight;
         experience.classList.toggle("portrait",imageData.height>imageData.width);
         experience.classList.toggle("landscape",imageData.width>=imageData.height);
         incoming.alt = "Yahya memory "+(memoryState.index+1)+" of "+memoryState.images.length;
@@ -3611,6 +3612,17 @@ function showMemoryPhoto(index,animate){
         caption.classList.toggle("visible",memoryState.index%2===0);
         memoryState.imageLayer = memoryState.imageLayer===0 ? 1 : 0;
         startMemorySlideTimer();
+
+        const upcoming = memoryState.images[memoryState.index+1];
+        if(upcoming && !upcoming.preloader){
+            upcoming.preloader = new Image();
+            upcoming.preloader.onload = function(){
+                upcoming.width = upcoming.preloader.naturalWidth;
+                upcoming.height = upcoming.preloader.naturalHeight;
+            };
+            upcoming.preloader.onerror = function(){upcoming.failed = true;};
+            upcoming.preloader.src = upcoming.src;
+        }
     };
     incoming.onerror = function(){
         incoming.onload = null;
@@ -3660,7 +3672,7 @@ function advanceMemorySlide(direction){
     if(!memoryState.open || document.getElementById("memoryExperience").classList.contains("ending")){return;}
     clearTimeout(memoryState.timer);
     const next = memoryState.index+direction;
-    if(next >= memoryState.images.length){finishMemorySlideshow();return;}
+    if(next >= memoryState.images.length){return;}
     showMemoryPhoto(Math.max(0,next),true);
     if(next===2 || next===5){showMemoryIntertitle(next===2 ? "Some moments become memories." : "And some memories stay forever.");}
 }
@@ -3680,25 +3692,6 @@ function showMemoryIntertitle(text){
         heading.hidden = false;
         subtitle.textContent = "Beautiful moments. Beautiful memories.";
     },1300);
-}
-
-function startMemoryMusic(){
-    const audioAlreadyPlaying = !cakeBirthdaySong.paused || !!cakeSynthMaster;
-    memoryState.musicStartedHere = !audioAlreadyPlaying;
-    if(memoryState.musicStartedHere){
-        startCakeBirthdaySong();
-    }
-
-    if(!memoryState.audioEndedHandler){
-        memoryState.audioEndedHandler = function(){
-            if(memoryState.open && memoryState.index===memoryState.images.length-1){
-                finishMemorySlideshow();
-            }else if(memoryState.open && memoryState.musicStartedHere){
-                startCakeBirthdaySong();
-            }
-        };
-        cakeBirthdaySong.addEventListener("ended",memoryState.audioEndedHandler);
-    }
 }
 
 function setMemoryMuted(muted){
@@ -3756,6 +3749,22 @@ function createFinalMemorySparkles(){
             experience.appendChild(spark);
             setTimeout(function(){spark.remove();},2400);
         },index*160);
+    }
+
+    const confettiColors = ["#e7c47e","#f5e3bd","#bda5c9","#d9ad78"];
+    for(let index=0;index<18;index++){
+        setTimeout(function(){
+            if(!memoryState.open){return;}
+            const piece = document.createElement("i");
+            piece.className = "memoryFinalConfetti";
+            piece.style.left = Math.random()*100+"%";
+            piece.style.setProperty("--memory-confetti",confettiColors[index%confettiColors.length]);
+            piece.style.setProperty("--memory-confetti-duration",(3.6+Math.random()*1.7)+"s");
+            piece.style.setProperty("--memory-confetti-delay",(Math.random()*.35)+"s");
+            piece.style.setProperty("--memory-confetti-drift",Math.round(Math.random()*80-40)+"px");
+            experience.appendChild(piece);
+            setTimeout(function(){piece.remove();},5700);
+        },index*115);
     }
 }
 
@@ -3885,9 +3894,9 @@ function openMemoryExperience(){
     document.getElementById("memoryPhotoB").className = "memoryPhoto";
     document.getElementById("memoryCaption").classList.remove("visible");
     document.getElementById("memoryTimelineFill").classList.remove("running");
+    document.getElementById("memoryCounter").textContent = "01 / --";
     document.body.style.overflow = "hidden";
     experience.focus({preventScroll:true});
-    createFinalMemorySparkles();
     memoryState.particleTimer = setInterval(addMemoryParticles,9000);
     addMemoryParticles();
     attachMemoryListeners();
@@ -3902,9 +3911,14 @@ function openMemoryExperience(){
             introTitle.textContent = "MY MEMORIES";
             introSubtitle.textContent = "No photos could be loaded from the memories folder.";
             intro.classList.add("visible");
+            if(memoryState.musicStartedHere){
+                stopCakeBirthdaySong();
+                memoryState.musicStartedHere = false;
+            }
             return;
         }
-        images.slice(0,3).forEach(function(data){const preload=new Image();preload.src=data.src;});
+        document.getElementById("memoryCounter").textContent =
+            "01 / "+String(images.length).padStart(2,"0");
         memoryState.introTimer = setTimeout(function(){
             if(!memoryState.open){return;}
             experience.classList.remove("transitioning");
